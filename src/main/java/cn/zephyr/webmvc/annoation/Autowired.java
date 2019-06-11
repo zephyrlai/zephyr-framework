@@ -10,7 +10,7 @@ import java.lang.annotation.*;
 @Target({ElementType.FIELD})   // 作用在属性上
 @Retention(RetentionPolicy.RUNTIME) // 运行时起效
 @Documented //可被识别
-public @interface Autowire {
+public @interface Autowired {
 
     String value() default "";
 }

@@ -1,6 +1,8 @@
 package cn.zephyr.webmvc.servlet;
 
+import cn.zephyr.webmvc.annoation.Autowired;
 import cn.zephyr.webmvc.annoation.Controller;
+import cn.zephyr.webmvc.annoation.RequestMapping;
 import cn.zephyr.webmvc.annoation.Service;
 
 import javax.servlet.ServletConfig;
@@ -11,6 +13,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 
@@ -27,6 +31,8 @@ public class DispatchServlet extends HttpServlet {
     private List<String> classNameList = new ArrayList<String>();
     // 存储类名与对应实例的IOC容器
     private Map<String,Object> iocMap = new HashMap<String, Object>();
+    // 存放请求路径与对应的方法
+    private Map<String,Method> handlerMapping = new HashMap<String, Method>();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -134,9 +140,52 @@ public class DispatchServlet extends HttpServlet {
     }
 
     private void doAutowired() {
+        if(iocMap.isEmpty())
+            return ;
+        for (Map.Entry<String, Object> entry : iocMap.entrySet()) {
+            Field[] fields = entry.getValue().getClass().getDeclaredFields();
+            for (Field field : fields) {
+                // 没被注解标记，则不注入
+                if(!field.isAnnotationPresent(Autowired.class))
+                    continue;
+                Autowired autowired = field.getAnnotation(Autowired.class);
+                String beanName = autowired.value().trim();
+                if("".equals(beanName))
+                    beanName = field.getType().getName();
+                // 处理private属性
+                field.setAccessible(true);
+                try {
+                    // 赋值（注入）
+                    field.set(entry.getValue(),iocMap.get(beanName));
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     private void initHandlerMapping() {
+        if(iocMap.isEmpty())
+            return;
+        for (Map.Entry<String, Object> entry : iocMap.entrySet()) {
+            Class<?> clazz = entry.getValue().getClass();
+            if(!clazz.isAnnotationPresent(Controller.class))
+                continue;
+            String baseUrl = "" ;
+            if(clazz.isAnnotationPresent(RequestMapping.class)){
+                RequestMapping requestMapping = clazz.getAnnotation(RequestMapping.class);
+                baseUrl = requestMapping.value();
+            }
+            Method[] methods = clazz.getMethods();
+            for (Method method : methods) {
+                if(!method.isAnnotationPresent(RequestMapping.class))
+                    continue;
+                RequestMapping requestMapping = method.getAnnotation(RequestMapping.class);
+                String url = (baseUrl + requestMapping.value()).replaceAll("/+", "/");
+                handlerMapping.put(url,method);
+                System.err.println( "Mapped "+url+"into"+method.getName());
+            }
+        }
     }
 
 }
