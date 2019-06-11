@@ -36,12 +36,29 @@ public class DispatchServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        super.doGet(req, resp);
+        doPost(req, resp);
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        super.doPost(req, resp);
+        doDispatch(req,resp);
+    }
+
+    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) {
+        String uri = req.getRequestURI();
+        String contextPath = req.getContextPath();
+        uri.replace(contextPath,"").replaceAll("/+","/");
+
+        if(!this.handlerMapping.containsKey(uri)){
+            try {
+                resp.getWriter().write("404 not found!");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return ;
+        }
+        Method method = this.handlerMapping.get(uri);
+        System.err.println(method.getName());
     }
 
     /**
@@ -64,6 +81,7 @@ public class DispatchServlet extends HttpServlet {
         doAutowired();
         // 5. 初始化HandlerMapping
         initHandlerMapping();
+        System.err.println("zephyr-framework is on the run");
     }
 
     private void doLoadConfig(String contextConfigLocation) {
@@ -84,7 +102,7 @@ public class DispatchServlet extends HttpServlet {
     }
 
     private void doScanner(String scanPackage) {
-        URL url = this.getClass().getClassLoader().getResource(scanPackage.replace("\\.", "/"));
+        URL url = this.getClass().getClassLoader().getResource(scanPackage.replaceAll("\\.", "/"));
         File classDir = new File(url.getFile());
         for (File file : classDir.listFiles()) {
             if(file.isDirectory())
@@ -183,7 +201,7 @@ public class DispatchServlet extends HttpServlet {
                 RequestMapping requestMapping = method.getAnnotation(RequestMapping.class);
                 String url = (baseUrl + requestMapping.value()).replaceAll("/+", "/");
                 handlerMapping.put(url,method);
-                System.err.println( "Mapped "+url+"into"+method.getName());
+                System.err.println( "Mapped "+url);
             }
         }
     }
